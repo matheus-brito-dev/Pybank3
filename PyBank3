@@ -1,0 +1,296 @@
+from abc import ABC, abstractmethod
+from datetime import datetime
+#classes
+class Transacao(ABC):
+    @abstractmethod
+    def executar(self, conta):
+        pass
+
+class Deposito(Transacao):
+    def __init__(self, valor):
+        self.valor = valor
+
+    def executar(self, conta):
+        if self.valor <= 0:
+            print("O valor do depósito deve ser positivo.")
+            return False
+        else:
+            conta.set_saldo(conta.get_saldo() + self.valor)
+            conta.get_historico().adicionar_transacao(self)
+            print(f"Depósito de {self.valor} realizado com sucesso.")
+            return True
+
+class Saque(Transacao):
+    def __init__(self, valor):
+        self.valor = valor
+
+    def executar(self, conta):
+        if self.valor > conta.get_saldo():
+            print("Saldo insuficiente para saque.")
+            return False
+        else:
+            conta.set_saldo(conta.get_saldo() - self.valor)
+            conta.get_historico().adicionar_transacao(self)
+            print(f"Saque de {self.valor} realizado com sucesso.")
+            return True
+
+class Transferencia(Transacao):
+    def __init__(self, valor, conta_destino):
+        self.valor = valor
+        self.conta_destino = conta_destino
+
+    def executar(self, conta_origem):
+        if self.valor > conta_origem.get_saldo():
+            print("Impossível transferir, saldo insuficiente!")
+            return False
+        else:
+            conta_origem.set_saldo(conta_origem.get_saldo() - self.valor)
+            self.conta_destino.set_saldo(self.conta_destino.get_saldo() + self.valor)
+            conta_origem.get_historico().adicionar_transacao(self)
+            self.conta_destino.get_historico().adicionar_transacao(self)
+            print(f"Transferência de {self.valor} realizada com sucesso.")
+            return True
+
+class Conta:
+    def __init__(self, numero, agencia, cliente=None):
+        self._saldo = 0.0
+        self._numero = numero
+        self._agencia = agencia
+        self._cliente = cliente
+        self._historico = Historico()
+
+    def get_saldo(self):
+        return self._saldo
+
+    def set_saldo(self, novo_saldo):
+        self._saldo = novo_saldo
+
+    def get_numero(self):
+        return self._numero
+
+    def get_historico(self):
+        return self._historico
+
+class ContaCorrente(Conta):
+    def __init__(self, numero, agencia, limite, limite_saques):
+        super().__init__(numero, agencia)
+        self._limite = limite
+        self._limite_saques = limite_saques
+
+    def get_limite(self):
+        return self._limite
+
+    def get_limite_saques(self):
+        return self._limite_saques
+
+class Historico:
+    def __init__(self):
+        self.transacoes = []
+
+    def adicionar_transacao(self, transacao):
+        self.transacoes.append((transacao, datetime.now()))
+
+    def listar_transacoes(self):
+        for transacao, data in self.transacoes:
+            print(f"{transacao.__class__.__name__} de {transacao.valor} em {data}")
+
+class Cliente:
+    def __init__(self, endereco, contas):
+        self._endereco = endereco
+        self._contas = contas
+
+    def get_endereco(self):
+        return self._endereco
+
+    def get_contas(self):
+        return self._contas
+
+    def realizar_transacao(self, conta, transacao):
+        transacao.executar(conta)
+
+    def adicionar_conta(self, conta):
+        self._contas.append(conta)
+        print(f"Conta {conta.get_numero()} adicionada com sucesso.")
+
+    def listar_contas(self):
+        for conta in self._contas:
+            print(f"Conta número {conta.get_numero()}")
+
+class PessoaFisica(Cliente):
+    def __init__(self, endereco, contas, cpf, nome, data_nascimento):
+        super().__init__(endereco, contas)
+        self._cpf = cpf
+        self._nome = nome
+        self._data_nascimento = data_nascimento
+
+    def get_cpf(self):
+        return self._cpf
+
+    def get_nome(self):
+        return self._nome
+
+    def get_data_nascimento(self):
+        return self._data_nascimento
+    
+
+
+#main
+decorator = '-'
+largura = 40
+titulo = "Bem vindo ao PyBank v.OOP"
+print(f"{titulo.center(largura, decorator)}\n\n[1] - Criar Conta\n[2] - Criar Cliente\n[3] - Depositar\n[4] - Sacar\n[5] - Transferir\n[6] - Extrato\n[7] - Listar Contas\n[8] - Listar Usuários\n[9] - Sair")
+
+clientes = []
+contas = []
+
+while True:
+    op = int(input("Informe sua opção: "))
+
+    if op == 1:
+        numero = int(input("Informe o número da conta: "))
+        agencia = input("Informe a agência do banco: ")
+        limite = float(input("Informe o limite da conta: "))
+        limite_saques = int(input("Informe a quantidade de saques: "))
+        conta = ContaCorrente(numero, agencia, limite, limite_saques)
+        contas.append(conta)
+        print(f"Conta {numero} criada com sucesso!")
+
+    elif op == 2:
+        nome = input("Informe o nome: ")
+        cpf = input("Informe o CPF (somente números): ")
+        data_nascimento = input("Informe a data de nascimento: ")
+        endereco = input("Informe seu endereço: ")
+
+        if not contas:
+            print("Não há contas cadastradas.")
+            continue
+
+        print("Listagem de contas cadastradas:")
+        for i, conta in enumerate(contas):
+            print(f"[{i}] Conta número {conta.get_numero()}")
+
+        indices_contas = input("Informe os números das contas a serem associadas (SEPARADOS POR VÍRGULAS): ")
+        indices_contas = [int(i) for i in indices_contas.split(",")]
+
+        contas_selecionadas = [contas[i] for i in indices_contas]
+        cliente = PessoaFisica(endereco, contas_selecionadas, cpf, nome, data_nascimento)
+        clientes.append(cliente)
+        print(f"Cliente {nome} criado com sucesso e contas associadas!")
+
+    elif op == 3:
+        if not clientes:
+            print("Não há clientes cadastrados.")
+            continue
+
+        print("Listagem de clientes cadastrados:")
+        for i, cliente in enumerate(clientes):
+            print(f"[{i}] {cliente.get_nome()}")
+
+        indice_cliente = int(input("Informe o número do cliente para realizar a transação: "))
+        cliente = clientes[indice_cliente]
+
+        print("Listagem de contas do cliente:")
+        for i, conta in enumerate(cliente.get_contas()):
+            print(f"[{i}] Conta número {conta.get_numero()}")
+
+        indice_conta = int(input("Informe o número da conta para depósito: "))
+        conta = cliente.get_contas()[indice_conta]
+
+        valor = float(input("Informe o valor do depósito: "))
+        deposito = Deposito(valor)
+        deposito.executar(conta)
+
+    elif op == 4:
+        if not clientes:
+            print("Não há clientes cadastrados.")
+            continue
+
+        print("Listagem de clientes cadastrados:")
+        for i, cliente in enumerate(clientes):
+            print(f"[{i}] {cliente.get_nome()}")
+
+        indice_cliente = int(input("Informe o número do cliente para realizar a transação: "))
+        cliente = clientes[indice_cliente]
+
+        print("Listagem de contas do cliente:")
+        for i, conta in enumerate(cliente.get_contas()):
+            print(f"[{i}] Conta número {conta.get_numero()}")
+
+        indice_conta = int(input("Informe o número da conta para saque: "))
+        conta = cliente.get_contas()[indice_conta]
+
+        valor = float(input("Informe o valor do saque: "))
+        saque = Saque(valor)
+        saque.executar(conta)
+
+    elif op == 5:
+        if not clientes:
+            print("Não há clientes cadastrados.")
+            continue
+
+        print("Listagem de clientes cadastrados:")
+        for i, cliente in enumerate(clientes):
+            print(f"[{i}] {cliente.get_nome()}")
+
+        indice_cliente_origem = int(input("Informe o número do cliente de origem: "))
+        cliente_origem = clientes[indice_cliente_origem]
+
+        print("Listagem de contas do cliente de origem:")
+        for i, conta in enumerate(cliente_origem.get_contas()):
+            print(f"[{i}] Conta número {conta.get_numero()}")
+
+        indice_conta_origem = int(input("Informe o número da conta de origem: "))
+        conta_origem = cliente_origem.get_contas()[indice_conta_origem]
+
+        valor = float(input("Informe o valor da transferência: "))
+
+        print("Listagem de clientes para o destino:")
+        for i, cliente in enumerate(clientes):
+            print(f"[{i}] {cliente.get_nome()}")
+
+        indice_cliente_destino = int(input("Informe o número do cliente destino: "))
+        cliente_destino = clientes[indice_cliente_destino]
+
+        print("Listagem de contas do cliente destino:")
+        for i, conta in enumerate(cliente_destino.get_contas()):
+            print(f"[{i}] Conta número {conta.get_numero()}")
+
+        indice_conta_destino = int(input("Informe o número da conta destino: "))
+        conta_destino = cliente_destino.get_contas()[indice_conta_destino]
+
+        transferencia = Transferencia(valor, conta_destino)
+        transferencia.executar(conta_origem)
+
+    elif op == 6:
+        if not clientes:
+            print("Não há clientes cadastrados.")
+            continue
+
+        print("Listagem de clientes cadastrados:")
+        for i, cliente in enumerate(clientes):
+            print(f"[{i}] {cliente.get_nome()}")
+
+        indice_cliente = int(input("Informe o número do cliente para visualizar o extrato: "))
+        cliente = clientes[indice_cliente]
+
+        print("Listagem de contas do cliente:")
+        for conta in cliente.get_contas():
+            print(f"Conta número {conta.get_numero()}:")
+            conta.get_historico().listar_transacoes()
+
+    elif op == 7:
+        print("Listagem de contas cadastradas:")
+        for conta in contas:
+            print(f"Conta número {conta.get_numero()}")
+
+    elif op == 8:
+        print("Listagem de clientes cadastrados:")
+        for cliente in clientes:
+            print(f"Cliente: {cliente.get_nome()} - CPF: {cliente.get_cpf()}")
+
+    elif op == 9:
+        print("O PyBank agradece sua visita, volte sempre!")
+        break
+
+    else:
+        print("Opção inválida, por favor digite uma opção válida")
